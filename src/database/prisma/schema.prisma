@@ -1,0 +1,221 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User Model
+// ============================================
+model User {
+  id        String   @id @default(uuid())
+  email     String?  @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  practices      Practice[]
+  reviews        Review[]
+  analytics      UserAnalytics?
+  errorPatterns  ErrorPattern[]
+  sessions       PracticeSession[]
+
+  @@map("users")
+}
+
+// ============================================
+// Practice Session Model
+// ============================================
+model PracticeSession {
+  id            String        @id @default(uuid())
+  userId        String
+  startTime     DateTime
+  endTime       DateTime?
+  practiceCount Int           @default(0)
+  avgScore      Float?
+  status        SessionStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("practice_sessions")
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+}
+
+// ============================================
+// Practice Model
+// ============================================
+model Practice {
+  id     String @id @default(uuid())
+  userId String
+  sessionId String?
+
+  // Audio Information
+  audioUrl      String
+  audioDuration Float // seconds
+  audioSize     Int   // bytes
+
+  // Transcribed Text
+  transcribedText String
+  originalText    String? // Optional: what user wanted to say
+
+  // AI Analysis Scores
+  grammarScore       Float // 0-100
+  pronunciationScore Float // 0-100
+  fluencyScore       Float // 0-100
+  overallScore       Float // 0-100
+
+  // Detailed Feedback (stored as JSON)
+  grammarErrors       Json // GrammarError[]
+  pronunciationIssues Json // PronunciationIssue[]
+  correctedText       String
+  suggestions         Json // string[]
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([sessionId])
+  @@map("practices")
+}
+
+// ============================================
+// Review Model
+// ============================================
+model Review {
+  id     String   @id @default(uuid())
+  userId String
+  date   DateTime @default(now()) @db.Date
+
+  // Review Content
+  exercises      Json // Exercise[]
+  totalExercises Int
+  completedCount Int          @default(0)
+  correctCount   Int          @default(0)
+
+  // Status
+  status      ReviewStatus @default(PENDING)
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submissions ExerciseSubmission[]
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("reviews")
+}
+
+enum ReviewStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+// ============================================
+// Exercise Submission Model
+// ============================================
+model ExerciseSubmission {
+  id           String       @id @default(uuid())
+  reviewId     String
+  exerciseId   String
+  exerciseType ExerciseType
+
+  userAnswer    String
+  correctAnswer String
+  isCorrect     Boolean
+
+  submittedAt DateTime @default(now())
+
+  // Relations
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+  @@map("exercise_submissions")
+}
+
+enum ExerciseType {
+  FILL_BLANK
+  MULTIPLE_CHOICE
+  REWRITE
+  SPEAKING
+}
+
+// ============================================
+// User Analytics Model
+// ============================================
+model UserAnalytics {
+  id     String @id @default(uuid())
+  userId String @unique
+
+  // Statistics
+  totalPractices Int @default(0)
+  totalReviews   Int @default(0)
+  currentStreak  Int @default(0)
+  longestStreak  Int @default(0)
+
+  // Average Scores
+  avgGrammarScore       Float?
+  avgPronunciationScore Float?
+  avgFluencyScore       Float?
+  avgOverallScore       Float?
+
+  // Progress Tracking
+  lastPracticeDate DateTime?
+  lastReviewDate   DateTime?
+
+  // Error Statistics (stored as JSON)
+  commonErrors Json // Map<ErrorType, Count>
+
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_analytics")
+}
+
+// ============================================
+// Error Pattern Model
+// ============================================
+model ErrorPattern {
+  id            String   @id @default(uuid())
+  userId        String
+  errorType     String // grammar, pronunciation, etc.
+  errorCategory String // tense, article, word_stress, etc.
+  description   String
+  example       String
+  frequency     Int      @default(1)
+  lastOccurred  DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, errorType])
+  @@index([userId, frequency])
+  @@map("error_patterns")
+}
