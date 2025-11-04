@@ -1,5 +1,4 @@
 import OpenAI from 'openai';
-import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { openaiConfig } from '../../config/openai';
 import { logger } from '../../shared/utils/logger';
 import { AppError } from '../../shared/utils/errors';
@@ -21,17 +20,25 @@ const openai = new OpenAI({
 logger.info('OpenAI text generation client initialized');
 
 /**
- * Text generation options
+ * Text generation options for Responses API
+ * Based on https://platform.openai.com/docs/api-reference/responses/create
+ * Note: Responses API does not support frequency_penalty, presence_penalty, or stop
  */
 export interface TextGenerationOptions {
   model?: string;
   temperature?: number;
-  maxTokens?: number;
+  maxOutputTokens?: number;
   topP?: number;
-  frequencyPenalty?: number;
-  presencePenalty?: number;
-  stop?: string | string[];
-  user?: string;
+  tools?: Array<any>; // Built-in tools, MCP tools, or function calls
+  toolChoice?: string | object;
+  parallelToolCalls?: boolean;
+  instructions?: string; // System message
+  previousResponseId?: string; // For stateful conversations
+  store?: boolean; // Whether to store the response
+  stream?: boolean;
+  safetyIdentifier?: string; // Replaces deprecated user field
+  metadata?: Record<string, string>;
+  include?: Array<string>; // Additional output data to include
 }
 
 /**
@@ -48,107 +55,199 @@ export interface ChatMessage {
 }
 
 /**
- * Text generation response
+ * Text generation response from Responses API
+ * Based on https://platform.openai.com/docs/api-reference/responses/create
  */
 export interface TextGenerationResponse {
-  text: string;
+  text: string; // Extracted from output[].content[].text
   model: string;
   usage: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
+    promptTokens: number; // input_tokens
+    completionTokens: number; // output_tokens
+    totalTokens: number; // total_tokens
+    cachedTokens?: number; // input_tokens_details.cached_tokens
+    reasoningTokens?: number; // output_tokens_details.reasoning_tokens
   };
-  finishReason: string;
-  id: string;
-  created: number;
+  status: string; // completed, failed, in_progress, etc.
+  id: string; // Response ID
+  createdAt: number; // created_at timestamp
+  output: Array<any>; // Full output array for advanced use cases
 }
 
 /**
- * Generate text completion using OpenAI GPT models
+ * Generate text completion using OpenAI Responses API
  *
- * @param messages - Array of chat messages
+ * @param input - String input or array of chat messages
  * @param options - Optional generation settings
  * @returns Generated text and metadata
  *
  * @example
  * ```typescript
- * const messages = [
- *   { role: 'system', content: 'You are a helpful English teacher.' },
- *   { role: 'user', content: 'Explain the past perfect tense.' }
- * ];
- *
- * const result = await generateText(messages, {
+ * // Simple string input
+ * const result = await generateText('Tell me a story', {
  *   temperature: 0.7,
- *   maxTokens: 500
+ *   maxOutputTokens: 500
  * });
  *
- * console.log(result.text);
+ * // With system instructions
+ * const result = await generateText('Explain the past perfect tense.', {
+ *   instructions: 'You are a helpful English teacher.',
+ *   temperature: 0.7,
+ *   maxOutputTokens: 500
+ * });
+ *
+ * // With conversation history using messages
+ * const result = await generateText([
+ *   { role: 'user', content: 'Hello' },
+ *   { role: 'assistant', content: 'Hi there!' },
+ *   { role: 'user', content: 'How are you?' }
+ * ], {
+ *   instructions: 'You are a friendly assistant.',
+ * });
  * ```
  */
 export async function generateText(
-  messages: ChatMessage[],
+  input: string | ChatMessage[],
   options: TextGenerationOptions = {}
 ): Promise<TextGenerationResponse> {
   try {
     const {
       model = openaiConfig.gpt.model,
       temperature = openaiConfig.gpt.temperature,
-      maxTokens = openaiConfig.gpt.maxTokens,
+      maxOutputTokens = openaiConfig.gpt.maxTokens,
       topP = 1,
-      frequencyPenalty = 0,
-      presencePenalty = 0,
-      stop,
-      user,
+      tools,
+      toolChoice,
+      parallelToolCalls = true,
+      instructions,
+      previousResponseId,
+      store = false,
+      stream = false,
+      safetyIdentifier,
+      metadata,
+      include,
     } = options;
 
-    logger.info('Generating text completion', {
-      model,
-      messageCount: messages.length,
-      temperature,
-      maxTokens,
-    });
+    // Prepare input for Responses API
+    let apiInput: string | Array<any>;
 
-    // Convert messages to OpenAI format
-    const formattedMessages: ChatCompletionMessageParam[] = messages.map(msg => ({
-      role: msg.role,
-      content: msg.content,
-    }));
-
-    // Call OpenAI Chat Completions API
-    const completion = await openai.chat.completions.create({
-      model,
-      messages: formattedMessages,
-      temperature,
-      max_tokens: maxTokens,
-      top_p: topP,
-      frequency_penalty: frequencyPenalty,
-      presence_penalty: presencePenalty,
-      stop,
-      user,
-    });
-
-    logger.info('Text generation completed successfully', {
-      id: completion.id,
-      model: completion.model,
-      usage: completion.usage,
-    });
-
-    const choice = completion.choices[0];
-    if (!choice || !choice.message) {
-      throw new Error('No completion choice returned from OpenAI');
+    if (typeof input === 'string') {
+      apiInput = input;
+    } else {
+      // Convert ChatMessage array to Responses API format
+      // Extract system message as instructions if present
+      const userMessages = input.filter(msg => msg.role !== 'system');
+      apiInput = userMessages.map(msg => ({
+        type: 'message',
+        role: msg.role,
+        content: msg.content,
+      }));
     }
 
+    // Extract system instructions from messages if not provided
+    let systemInstructions = instructions;
+    if (!systemInstructions && Array.isArray(input)) {
+      const systemMessage = input.find(msg => msg.role === 'system');
+      if (systemMessage) {
+        systemInstructions = systemMessage.content;
+      }
+    }
+
+    logger.info('Generating text using Responses API', {
+      model,
+      inputType: typeof input === 'string' ? 'string' : 'messages',
+      messageCount: Array.isArray(input) ? input.length : 1,
+      temperature,
+      maxOutputTokens,
+      hasInstructions: !!systemInstructions,
+    });
+
+    // Detect if model is an o-series or reasoning model
+    // o-series models (o1, o3, o3-mini, gpt-5) don't support temperature/top_p
+    const isReasoningModel = model.startsWith('o1') ||
+                             model.startsWith('o3') ||
+                             model.startsWith('gpt-5');
+
+    // Log warning if reasoning model is used with unsupported parameters
+    if (isReasoningModel && (temperature !== undefined || topP !== undefined)) {
+      logger.warn('Reasoning model detected - temperature and top_p parameters will be ignored', {
+        model,
+        temperature,
+        topP,
+      });
+    }
+
+    // Build request parameters
+    const requestParams: any = {
+      model,
+      input: apiInput,
+      parallel_tool_calls: parallelToolCalls,
+      store,
+      stream,
+      reasoning: { effort: 'low' }
+    };
+
+    // Add temperature and top_p only for non-reasoning models
+    if (!isReasoningModel) {
+      if (temperature !== undefined) requestParams.temperature = temperature;
+      if (topP !== undefined) requestParams.top_p = topP;
+    }
+
+    // Add optional parameters
+    if (maxOutputTokens) requestParams.max_output_tokens = maxOutputTokens;
+    if (systemInstructions) requestParams.instructions = systemInstructions;
+    if (tools && tools.length > 0) requestParams.tools = tools;
+    if (toolChoice) requestParams.tool_choice = toolChoice;
+    if (previousResponseId) requestParams.previous_response_id = previousResponseId;
+    if (safetyIdentifier) requestParams.safety_identifier = safetyIdentifier;
+    if (metadata) requestParams.metadata = metadata;
+    if (include) requestParams.include = include;
+
+    // Call OpenAI Responses API
+    const response = await openai.responses.create(requestParams);
+
+    console.log("response: ", response);
+    
+
+    logger.info('Text generation completed successfully', {
+      id: response.id,
+      model: response.model,
+      status: response.status,
+      usage: response.usage,
+    });
+
+    // Extract text from output
+    let extractedText = '';
+    if (response.output && Array.isArray(response.output) && response.output.length > 0) {
+      // Find the first message with output_text
+      for (const item of response.output) {
+        if (item.type === 'message' && item.content && Array.isArray(item.content)) {
+          for (const contentItem of item.content) {
+            if (contentItem.type === 'output_text' && contentItem.text) {
+              extractedText = contentItem.text;
+              break;
+            }
+          }
+        }
+        if (extractedText) break;
+      }
+    }
+    console.log("extractedText: ", extractedText);
+
     return {
-      text: choice.message.content || '',
-      model: completion.model,
+      text: extractedText,
+      model: response.model,
       usage: {
-        promptTokens: completion.usage?.prompt_tokens || 0,
-        completionTokens: completion.usage?.completion_tokens || 0,
-        totalTokens: completion.usage?.total_tokens || 0,
+        promptTokens: response.usage?.input_tokens || 0,
+        completionTokens: response.usage?.output_tokens || 0,
+        totalTokens: response.usage?.total_tokens || 0,
+        cachedTokens: response.usage?.input_tokens_details?.cached_tokens || 0,
+        reasoningTokens: response.usage?.output_tokens_details?.reasoning_tokens || 0,
       },
-      finishReason: choice.finish_reason,
-      id: completion.id,
-      created: completion.created,
+      status: response.status || 'completed',
+      id: response.id,
+      createdAt: response.created_at,
+      output: response.output,
     };
   } catch (error) {
     logger.error('Error generating text', {
@@ -192,6 +291,7 @@ export async function generateText(
 
 /**
  * Generate a simple completion from a single prompt
+ * Uses the Responses API with simple string input
  *
  * @param prompt - The user prompt
  * @param systemPrompt - Optional system prompt to set context
@@ -212,15 +312,11 @@ export async function generateCompletion(
   systemPrompt?: string,
   options: TextGenerationOptions = {}
 ): Promise<TextGenerationResponse> {
-  const messages: ChatMessage[] = [];
-
-  if (systemPrompt) {
-    messages.push({ role: 'system', content: systemPrompt });
-  }
-
-  messages.push({ role: 'user', content: prompt });
-
-  return generateText(messages, options);
+  // Use Responses API with instructions parameter for system prompt
+  return generateText(prompt, {
+    ...options,
+    instructions: systemPrompt || options.instructions,
+  });
 }
 
 /**
@@ -261,7 +357,7 @@ Format your response in clear sections.`;
 
   return generateCompletion(userPrompt, systemPrompt, {
     temperature: 0.3,
-    maxTokens: 1000,
+    maxOutputTokens: 1000,
     ...options,
   });
 }
@@ -288,7 +384,7 @@ Return a JSON object with:
 
   return generateCompletion(userPrompt, systemPrompt, {
     temperature: 0.2,
-    maxTokens: 800,
+    maxOutputTokens: 800,
     ...options,
   });
 }
@@ -322,7 +418,7 @@ Format as a numbered list with clear instructions and explanations.`;
 
   return generateCompletion(userPrompt, systemPrompt, {
     temperature: 0.7,
-    maxTokens: 1500,
+    maxOutputTokens: 1500,
     ...options,
   });
 }
@@ -341,11 +437,13 @@ export async function generateConversationResponse(
   options: TextGenerationOptions = {}
 ): Promise<TextGenerationResponse> {
   const systemPrompt = `You are a friendly English conversation partner helping someone practice English.
-- Keep responses natural and conversational
+- Keep responses natural and conversational directly related to the user's message
 - Gently correct errors by rephrasing correctly in your response
-- Ask follow-up questions to encourage more practice
+- If you need to correct errors, you may say something like this: 「You said: (repeat the error version), we often say: (corrected version)」
+- You must ask one follow-up question to encourage more practice after response
 - Use appropriate vocabulary for the learner's level
-- Be encouraging and supportive`;
+- Be encouraging and supportive
+- Limit your response to the number of sentences like the user's message`;
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
@@ -355,7 +453,7 @@ export async function generateConversationResponse(
 
   return generateText(messages, {
     temperature: 0.8,
-    maxTokens: 300,
+    maxOutputTokens: 300,
     ...options,
   });
 }
@@ -391,7 +489,7 @@ Always include:
 
   return generateCompletion(userPrompt, systemPrompt, {
     temperature: 0.5,
-    maxTokens: 1000,
+    maxOutputTokens: 1000,
     ...options,
   });
 }

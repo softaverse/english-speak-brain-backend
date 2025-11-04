@@ -10,9 +10,10 @@ export const openaiConfig = {
     temperature: 0.2,
   },
   gpt: {
-    model: 'gpt-4-turbo-preview',
+    model: 'gpt-5-nano-2025-08-07',
     temperature: 0.3,
     maxTokens: 2000,
+    // maxTokens: null,
   },
   timeout: 60000, // 60 seconds
 } as const;
