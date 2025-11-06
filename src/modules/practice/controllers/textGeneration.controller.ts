@@ -10,6 +10,9 @@ import { logger } from '@shared/utils/logger';
  * Controller for handling text generation requests
  */
 export class TextGenerationController {
+  private static readonly MAX_TOPIC_LENGTH = 1000;
+  private static readonly MAX_INITIAL_MESSAGE_LENGTH = 2000;
+
   /**
    * Talk with specific topic using reusable OpenAI prompt
    * POST /api/practice/generate/talk-with-topic
@@ -40,18 +43,18 @@ export class TextGenerationController {
         );
       }
 
-      if (topic.length > 1000) {
+      if (topic.length > TextGenerationController.MAX_TOPIC_LENGTH) {
         throw new AppError(
           ErrorCodes.VALIDATION_ERROR,
-          'Topic is too long. Maximum 1000 characters allowed.',
+          `Topic is too long. Maximum ${TextGenerationController.MAX_TOPIC_LENGTH} characters allowed.`,
           HttpStatus.BAD_REQUEST
         );
       }
 
-      if (initial_message.length > 2000) {
+      if (initial_message.length > TextGenerationController.MAX_INITIAL_MESSAGE_LENGTH) {
         throw new AppError(
           ErrorCodes.VALIDATION_ERROR,
-          'Initial message is too long. Maximum 2000 characters allowed.',
+          `Initial message is too long. Maximum ${TextGenerationController.MAX_INITIAL_MESSAGE_LENGTH} characters allowed.`,
           HttpStatus.BAD_REQUEST
         );
       }

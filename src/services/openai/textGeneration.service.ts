@@ -83,8 +83,8 @@ export async function talkWithSpecificTopic(
     // Build request parameters
     const requestParams: any = {
       prompt: {
-        id: "pmpt_690cafff67748196b1128b3affd644690712eb38faca12d4",
-        version: "8",
+        id: openaiConfig.prompts.talkWithSpecificTopic.id,
+        version: openaiConfig.prompts.talkWithSpecificTopic.version,
         variables: {
           topic: topic,
           initial_message: initial_message

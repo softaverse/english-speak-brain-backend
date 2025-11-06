@@ -15,5 +15,11 @@ export const openaiConfig = {
     maxTokens: 2000,
     // maxTokens: null,
   },
+  prompts: {
+    talkWithSpecificTopic: {
+      id: 'pmpt_690cafff67748196b1128b3affd644690712eb38faca12d4',
+      version: '8',
+    },
+  },
   timeout: 60000, // 60 seconds
 } as const;
