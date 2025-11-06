@@ -73,80 +73,14 @@ router.get(
 // ============ Text Generation Routes ============
 
 /**
- * @route   POST /api/practice/generate/text
- * @desc    Generate text from chat messages
+ * @route   POST /api/practice/generate/talk-with-topic
+ * @desc    Generate conversation with specific topic using reusable OpenAI prompt
  * @access  Public/Private
- * @body    {messages: ChatMessage[], options?: TextGenerationOptions}
+ * @body    {topic: string, initial_message: string, options?: TextGenerationOptions}
  */
 router.post(
-  '/generate/text',
-  TextGenerationController.generateText
-);
-
-/**
- * @route   POST /api/practice/generate/completion
- * @desc    Generate simple text completion
- * @access  Public/Private
- * @body    {prompt: string, systemPrompt?: string, options?: TextGenerationOptions}
- */
-router.post(
-  '/generate/completion',
-  TextGenerationController.generateCompletion
-);
-
-/**
- * @route   POST /api/practice/generate/analyze
- * @desc    Analyze English text for errors and improvements
- * @access  Public/Private
- * @body    {text: string, options?: TextGenerationOptions}
- */
-router.post(
-  '/generate/analyze',
-  TextGenerationController.analyzeText
-);
-
-/**
- * @route   POST /api/practice/generate/correct
- * @desc    Correct grammar errors in text
- * @access  Public/Private
- * @body    {text: string, options?: TextGenerationOptions}
- */
-router.post(
-  '/generate/correct',
-  TextGenerationController.correctGrammar
-);
-
-/**
- * @route   POST /api/practice/generate/exercises
- * @desc    Generate practice exercises
- * @access  Public/Private
- * @body    {errorType: string, difficulty?: string, count?: number, options?: TextGenerationOptions}
- */
-router.post(
-  '/generate/exercises',
-  TextGenerationController.generateExercises
-);
-
-/**
- * @route   POST /api/practice/generate/conversation
- * @desc    Generate conversational response
- * @access  Public/Private
- * @body    {message: string, history?: ChatMessage[], options?: TextGenerationOptions}
- */
-router.post(
-  '/generate/conversation',
-  TextGenerationController.generateConversation
-);
-
-/**
- * @route   POST /api/practice/generate/explain
- * @desc    Explain grammar concept
- * @access  Public/Private
- * @body    {concept: string, level?: string, options?: TextGenerationOptions}
- */
-router.post(
-  '/generate/explain',
-  TextGenerationController.explainConcept
+  '/generate/talk-with-topic',
+  TextGenerationController.talkWithSpecificTopic
 );
 
 export default router;
