@@ -16,11 +16,15 @@ export class TranslationController {
 
   /**
    * Validates the translation request parameters
-   * @param text - The text to validate
-   * @param targetLanguage - The target language to validate
+   * @param body - The request body containing text and targetLanguage
    * @throws {AppError} If validation fails
    */
-  private static validateRequest(text: unknown, targetLanguage: unknown): void {
+  private static validateRequest(body: {
+    text?: unknown;
+    targetLanguage?: unknown;
+  }): asserts body is { text: string; targetLanguage: string } {
+    const { text, targetLanguage } = body;
+
     // Validate text
     if (!text || typeof text !== 'string') {
       throw new AppError(
@@ -76,10 +80,16 @@ export class TranslationController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { text, targetLanguage = TranslationController.DEFAULT_TARGET_LANGUAGE } = req.body;
+      const body: { text?: unknown; targetLanguage?: unknown } = req.body;
+      if (body.targetLanguage === undefined) {
+        body.targetLanguage = TranslationController.DEFAULT_TARGET_LANGUAGE;
+      }
 
       // Validate request parameters
-      TranslationController.validateRequest(text, targetLanguage);
+      TranslationController.validateRequest(body);
+
+      // After validation, TypeScript knows text and targetLanguage are strings
+      const { text, targetLanguage } = body;
 
       logger.info('Translating text', {
         textLength: text.length,
