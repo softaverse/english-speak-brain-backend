@@ -12,7 +12,8 @@ import { logger } from '@shared/utils/logger';
 export class TranslationController {
   private static readonly MAX_TEXT_LENGTH = 5000;
   private static readonly DEFAULT_TARGET_LANGUAGE = 'zh-TW';
-  private static readonly SUPPORTED_LANGUAGES = new Set(SUPPORTED_LANGUAGES);
+  private static readonly SUPPORTED_LANGUAGES_SET = new Set(SUPPORTED_LANGUAGES);
+  private static readonly SUPPORTED_LANGUAGES_STRING = SUPPORTED_LANGUAGES.join(', ');
 
   /**
    * Validates the translation request parameters
@@ -59,10 +60,10 @@ export class TranslationController {
       );
     }
 
-    if (!TranslationController.SUPPORTED_LANGUAGES.has(targetLanguage)) {
+    if (!TranslationController.SUPPORTED_LANGUAGES_SET.has(targetLanguage)) {
       throw new AppError(
         ErrorCodes.VALIDATION_ERROR,
-        `Unsupported target language: ${targetLanguage}. Supported languages are: ${[...TranslationController.SUPPORTED_LANGUAGES].join(', ')}`,
+        `Unsupported target language: ${targetLanguage}. Supported languages are: ${TranslationController.SUPPORTED_LANGUAGES_STRING}`,
         HttpStatus.BAD_REQUEST
       );
     }
