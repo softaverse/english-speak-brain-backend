@@ -73,7 +73,7 @@ export async function translateText(
   targetLanguage: string
 ): Promise<TranslationResponse> {
   try {
-    const targetLanguageName = LANGUAGE_NAMES[targetLanguage] || targetLanguage;
+    const targetLanguageName = LANGUAGE_NAMES[targetLanguage];
 
     logger.info('Translating text', {
       textLength: text.length,

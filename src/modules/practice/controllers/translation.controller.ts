@@ -81,16 +81,19 @@ export class TranslationController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const body: { text?: unknown; targetLanguage?: unknown } = req.body;
-      if (body.targetLanguage === undefined) {
-        body.targetLanguage = TranslationController.DEFAULT_TARGET_LANGUAGE;
-      }
+      const bodyForValidation = {
+        text: req.body.text,
+        targetLanguage:
+          req.body.targetLanguage === undefined
+            ? TranslationController.DEFAULT_TARGET_LANGUAGE
+            : req.body.targetLanguage,
+      };
 
       // Validate request parameters
-      TranslationController.validateRequest(body);
+      TranslationController.validateRequest(bodyForValidation);
 
       // After validation, TypeScript knows text and targetLanguage are strings
-      const { text, targetLanguage } = body;
+      const { text, targetLanguage } = bodyForValidation;
 
       logger.info('Translating text', {
         textLength: text.length,
