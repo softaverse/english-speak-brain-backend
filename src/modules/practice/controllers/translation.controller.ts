@@ -11,6 +11,7 @@ import { logger } from '@shared/utils/logger';
  */
 export class TranslationController {
   private static readonly MAX_TEXT_LENGTH = 5000;
+  private static readonly DEFAULT_TARGET_LANGUAGE = 'zh-TW';
   private static readonly SUPPORTED_LANGUAGES = [
     'zh-CN',
     'zh-TW',
@@ -33,7 +34,7 @@ export class TranslationController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { text, targetLanguage = 'zh-CN' } = req.body;
+      const { text, targetLanguage = TranslationController.DEFAULT_TARGET_LANGUAGE } = req.body;
 
       // Validate text
       if (!text || typeof text !== 'string') {
@@ -70,7 +71,11 @@ export class TranslationController {
       }
 
       if (!TranslationController.SUPPORTED_LANGUAGES.includes(targetLanguage)) {
-        logger.warn(`Unsupported language requested: ${targetLanguage}. Using zh-CN as default.`);
+        throw new AppError(
+          ErrorCodes.VALIDATION_ERROR,
+          `Unsupported target language: ${targetLanguage}. Supported languages are: ${TranslationController.SUPPORTED_LANGUAGES.join(', ')}`,
+          HttpStatus.BAD_REQUEST
+        );
       }
 
       logger.info('Translating text', {

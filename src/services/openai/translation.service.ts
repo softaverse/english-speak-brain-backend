@@ -35,36 +35,39 @@ export interface TranslationResponse {
 }
 
 /**
+ * Language code to full name mapping
+ */
+const LANGUAGE_NAMES: Record<string, string> = {
+  'zh-CN': 'Simplified Chinese',
+  'zh-TW': 'Traditional Chinese',
+  'ja': 'Japanese',
+  'ko': 'Korean',
+  'es': 'Spanish',
+  'fr': 'French',
+  'de': 'German',
+};
+
+/**
  * Translate text from English to target language using OpenAI
  *
  * @param text - The text to translate
- * @param targetLanguage - The target language code (default: 'zh-CN' for Simplified Chinese)
+ * @param targetLanguage - The target language code (e.g., 'zh-TW', 'zh-CN', 'ja', etc.)
  * @returns Translation result
  *
  * @example
  * ```typescript
  * const result = await translateText(
  *   "Hello, how are you?",
- *   "zh-CN"
+ *   "zh-TW"
  * );
  * ```
  */
 export async function translateText(
   text: string,
-  targetLanguage: string = 'zh-TW'
+  targetLanguage: string
 ): Promise<TranslationResponse> {
   try {
-    const languageNames: Record<string, string> = {
-      'zh-CN': 'Simplified Chinese',
-      'zh-TW': 'Traditional Chinese',
-      'ja': 'Japanese',
-      'ko': 'Korean',
-      'es': 'Spanish',
-      'fr': 'French',
-      'de': 'German',
-    };
-
-    const targetLanguageName = languageNames[targetLanguage] || targetLanguage;
+    const targetLanguageName = LANGUAGE_NAMES[targetLanguage] || targetLanguage;
 
     logger.info('Translating text', {
       textLength: text.length,
@@ -72,7 +75,7 @@ export async function translateText(
     });
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: openaiConfig.gpt.model,
       messages: [
         {
           role: 'system',
@@ -83,8 +86,8 @@ export async function translateText(
           content: text,
         },
       ],
-      temperature: 0.3,
-      max_tokens: 2000,
+      temperature: openaiConfig.gpt.temperature,
+      max_tokens: openaiConfig.gpt.maxTokens,
     });
 
     const translatedText = completion.choices[0]?.message?.content?.trim() || '';
@@ -122,6 +125,10 @@ export async function translateText(
         stack: error.stack,
       } : error,
     });
+
+    if (error instanceof AppError) {
+      throw error;
+    }
 
     if (error instanceof OpenAI.APIError) {
       logger.error('OpenAI API Error details', {
