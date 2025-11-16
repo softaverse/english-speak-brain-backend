@@ -48,6 +48,12 @@ const LANGUAGE_NAMES: Record<string, string> = {
 };
 
 /**
+ * Supported languages for translation
+ * Derived from LANGUAGE_NAMES to ensure consistency
+ */
+export const SUPPORTED_LANGUAGES = Object.keys(LANGUAGE_NAMES) as Array<keyof typeof LANGUAGE_NAMES>;
+
+/**
  * Translate text from English to target language using OpenAI
  *
  * @param text - The text to translate

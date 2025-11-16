@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { translateText } from '@services/openai';
+import { translateText, SUPPORTED_LANGUAGES } from '@services/openai';
 import { ResponseHandler } from '@shared/utils/response';
 import { AppError } from '@shared/utils/errors';
 import { ErrorCodes } from '@shared/constants/errorCodes';
@@ -12,15 +12,7 @@ import { logger } from '@shared/utils/logger';
 export class TranslationController {
   private static readonly MAX_TEXT_LENGTH = 5000;
   private static readonly DEFAULT_TARGET_LANGUAGE = 'zh-TW';
-  private static readonly SUPPORTED_LANGUAGES = [
-    'zh-CN',
-    'zh-TW',
-    'ja',
-    'ko',
-    'es',
-    'fr',
-    'de',
-  ];
+  private static readonly SUPPORTED_LANGUAGES = new Set(SUPPORTED_LANGUAGES);
 
   /**
    * Validates the translation request parameters
@@ -63,10 +55,10 @@ export class TranslationController {
       );
     }
 
-    if (!TranslationController.SUPPORTED_LANGUAGES.includes(targetLanguage)) {
+    if (!TranslationController.SUPPORTED_LANGUAGES.has(targetLanguage)) {
       throw new AppError(
         ErrorCodes.VALIDATION_ERROR,
-        `Unsupported target language: ${targetLanguage}. Supported languages are: ${TranslationController.SUPPORTED_LANGUAGES.join(', ')}`,
+        `Unsupported target language: ${targetLanguage}. Supported languages are: ${[...TranslationController.SUPPORTED_LANGUAGES].join(', ')}`,
         HttpStatus.BAD_REQUEST
       );
     }
