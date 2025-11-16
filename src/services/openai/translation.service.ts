@@ -75,6 +75,14 @@ export async function translateText(
   try {
     const targetLanguageName = LANGUAGE_NAMES[targetLanguage];
 
+    if (!targetLanguageName) {
+      throw new AppError(
+        ErrorCodes.VALIDATION_ERROR,
+        `Unsupported target language: ${targetLanguage}`,
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
     logger.info('Translating text', {
       textLength: text.length,
       targetLanguage,

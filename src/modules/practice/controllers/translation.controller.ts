@@ -27,18 +27,10 @@ export class TranslationController {
     const { text, targetLanguage } = body;
 
     // Validate text
-    if (!text || typeof text !== 'string') {
+    if (typeof text !== 'string' || text.trim().length === 0) {
       throw new AppError(
         ErrorCodes.VALIDATION_ERROR,
-        'Text is required and must be a string',
-        HttpStatus.BAD_REQUEST
-      );
-    }
-
-    if (text.trim().length === 0) {
-      throw new AppError(
-        ErrorCodes.VALIDATION_ERROR,
-        'Text cannot be empty',
+        'Text is required and must be a non-empty string',
         HttpStatus.BAD_REQUEST
       );
     }
