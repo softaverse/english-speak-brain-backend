@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { TranscriptionController } from './controllers/transcription.controller';
 import { TextGenerationController } from './controllers/textGeneration.controller';
+import { TranslationController } from './controllers/translation.controller';
 import { MAX_AUDIO_FILE_SIZE } from '@services/openai';
 
 const router = Router();
@@ -81,6 +82,19 @@ router.get(
 router.post(
   '/generate/talk-with-topic',
   TextGenerationController.talkWithSpecificTopic
+);
+
+// ============ Translation Routes ============
+
+/**
+ * @route   POST /api/practice/translate
+ * @desc    Translate text from English to target language
+ * @access  Public/Private
+ * @body    {text: string, targetLanguage?: string}
+ */
+router.post(
+  '/translate',
+  TranslationController.translate
 );
 
 export default router;
