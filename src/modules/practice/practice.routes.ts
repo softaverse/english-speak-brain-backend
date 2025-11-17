@@ -84,6 +84,28 @@ router.post(
   TextGenerationController.talkWithSpecificTopic
 );
 
+/**
+ * @route   POST /api/practice/generate/text
+ * @desc    Generate text using OpenAI Responses API
+ * @access  Public/Private
+ * @body    {prompt: string, options?: TextGenerationOptions}
+ */
+router.post(
+  '/generate/text',
+  TextGenerationController.generateText
+);
+
+/**
+ * @route   POST /api/practice/generate/suggestions
+ * @desc    Generate response suggestions for conversation
+ * @access  Public/Private
+ * @body    {topic: string, conversationHistory: string, options?: TextGenerationOptions}
+ */
+router.post(
+  '/generate/suggestions',
+  TextGenerationController.generateSuggestions
+);
+
 // ============ Translation Routes ============
 
 /**
