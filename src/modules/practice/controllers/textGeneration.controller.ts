@@ -13,6 +13,7 @@ export class TextGenerationController {
   private static readonly MAX_TOPIC_LENGTH = 1000;
   private static readonly MAX_INITIAL_MESSAGE_LENGTH = 2000;
   private static readonly MAX_PROMPT_LENGTH = 5000;
+  private static readonly MAX_CONVERSATION_HISTORY_LENGTH = 10000;
 
   /**
    * Talk with specific topic using reusable OpenAI prompt
@@ -149,6 +150,14 @@ export class TextGenerationController {
         throw new AppError(
           ErrorCodes.VALIDATION_ERROR,
           `Topic is too long. Maximum ${TextGenerationController.MAX_TOPIC_LENGTH} characters allowed.`,
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      if (conversationHistory.length > TextGenerationController.MAX_CONVERSATION_HISTORY_LENGTH) {
+        throw new AppError(
+          ErrorCodes.VALIDATION_ERROR,
+          `Conversation history is too long. Maximum ${TextGenerationController.MAX_CONVERSATION_HISTORY_LENGTH} characters allowed.`,
           HttpStatus.BAD_REQUEST
         );
       }
