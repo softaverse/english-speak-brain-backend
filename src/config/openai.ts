@@ -12,8 +12,7 @@ export const openaiConfig = {
   gpt: {
     model: 'gpt-5-nano-2025-08-07',
     temperature: 0.3,
-    maxTokens: 2000,
-    // maxTokens: null,
+    maxCompletionTokens: 2000,
   },
   prompts: {
     talkWithSpecificTopic: {

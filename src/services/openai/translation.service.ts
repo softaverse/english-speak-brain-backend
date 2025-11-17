@@ -100,11 +100,10 @@ export async function translateText(
           content: text,
         },
       ],
-      temperature: openaiConfig.gpt.temperature,
-      max_tokens: openaiConfig.gpt.maxTokens,
+      max_completion_tokens: openaiConfig.gpt.maxCompletionTokens,
     });
 
-    const translatedText = completion.choices[0]?.message?.content?.trim() || '';
+    const translatedText = completion.choices[0]?.message?.content?.trim() ?? '';
 
     if (!translatedText) {
       throw new AppError(
