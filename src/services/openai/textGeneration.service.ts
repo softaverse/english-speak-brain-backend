@@ -185,6 +185,132 @@ export async function talkWithSpecificTopic(
   }
 }
 
+/**
+ * Generate text using OpenAI Responses API
+ * This function generates text based on a simple prompt
+ *
+ * @param prompt - The prompt for text generation
+ * @param options - Optional generation settings (store, include, etc.)
+ * @returns Generated text response
+ *
+ * @example
+ * ```typescript
+ * const result = await generateText("Tell me a three sentence bedtime story about a unicorn.");
+ * ```
+ */
+export async function generateText(
+  prompt: string,
+  options: TextGenerationOptions = {}
+): Promise<TextGenerationResponse> {
+  try {
+    const {
+      store = true,
+      include,
+    } = options;
+
+    logger.info('Generating text response', {
+      prompt: prompt.substring(0, 50) + '...',
+      store,
+    });
+
+    // Build request parameters
+    const requestParams: any = {
+      model: openaiConfig.gpt.model,
+      input: prompt,
+      store,
+    };
+
+    // Add include only if provided
+    if (include && include.length > 0) {
+      requestParams.include = include;
+    }
+
+    // Call OpenAI Responses API
+    const response = await openai.responses.create(requestParams);
+
+    console.log("response: ", response);
+
+    logger.info('Text generated successfully', {
+      id: response.id,
+      model: response.model,
+      status: response.status,
+      usage: response.usage,
+    });
+
+    // Extract text from output
+    let extractedText = '';
+    if (response.output && Array.isArray(response.output) && response.output.length > 0) {
+      // Find the first message with output_text
+      for (const item of response.output) {
+        if (item.type === 'message' && item.content && Array.isArray(item.content)) {
+          for (const contentItem of item.content) {
+            if (contentItem.type === 'output_text' && contentItem.text) {
+              extractedText = contentItem.text;
+              break;
+            }
+          }
+        }
+        if (extractedText) break;
+      }
+    }
+    console.log("extractedText: ", extractedText);
+
+    return {
+      text: extractedText,
+      model: response.model,
+      usage: {
+        promptTokens: response.usage?.input_tokens || 0,
+        completionTokens: response.usage?.output_tokens || 0,
+        totalTokens: response.usage?.total_tokens || 0,
+        cachedTokens: response.usage?.input_tokens_details?.cached_tokens || 0,
+        reasoningTokens: response.usage?.output_tokens_details?.reasoning_tokens || 0,
+      },
+      status: response.status || 'completed',
+      id: response.id,
+      createdAt: response.created_at,
+      output: response.output,
+    };
+  } catch (error) {
+    logger.error('Error generating text', {
+      error: error instanceof Error ? {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+      } : error,
+    });
+
+    if (error instanceof OpenAI.APIError) {
+      logger.error('OpenAI API Error details', {
+        status: error.status,
+        message: error.message,
+        type: error.type,
+        code: error.code,
+      });
+
+      throw new AppError(
+        ErrorCodes.OPENAI_API_ERROR,
+        `OpenAI API Error: ${error.message}`,
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+
+    if (error instanceof Error) {
+      throw new AppError(
+        ErrorCodes.INTERNAL_SERVER_ERROR,
+        `Failed to generate text: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+
+    throw new AppError(
+      ErrorCodes.INTERNAL_SERVER_ERROR,
+      'Failed to generate text',
+      HttpStatus.INTERNAL_SERVER_ERROR
+    );
+  }
+}
+
 export default {
   talkWithSpecificTopic,
+  generateText,
 };
