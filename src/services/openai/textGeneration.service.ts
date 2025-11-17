@@ -28,6 +28,31 @@ export interface TextGenerationOptions {
 }
 
 /**
+ * Request parameters for OpenAI Responses API with reusable prompt
+ */
+interface ResponsesAPIPromptRequestParams {
+  prompt: {
+    id: string;
+    version: string;
+    variables: Record<string, string>;
+  };
+  input: Array<any>;
+  reasoning: Record<string, any>;
+  store: boolean;
+  include?: Array<string>;
+}
+
+/**
+ * Request parameters for OpenAI Responses API with direct input
+ */
+interface ResponsesAPIInputRequestParams {
+  model: string;
+  input: string;
+  store: boolean;
+  include?: Array<string>;
+}
+
+/**
  * Text generation response from Responses API
  */
 export interface TextGenerationResponse {
@@ -81,7 +106,7 @@ export async function talkWithSpecificTopic(
     });
 
     // Build request parameters
-    const requestParams: any = {
+    const requestParams: ResponsesAPIPromptRequestParams = {
       prompt: {
         id: openaiConfig.prompts.talkWithSpecificTopic.id,
         version: openaiConfig.prompts.talkWithSpecificTopic.version,
@@ -102,8 +127,6 @@ export async function talkWithSpecificTopic(
 
     // Call OpenAI Responses API with reusable prompt
     const response = await openai.responses.create(requestParams);
-
-    console.log("response: ", response);
 
     logger.info('Topic conversation generated successfully', {
       id: response.id,
@@ -128,7 +151,6 @@ export async function talkWithSpecificTopic(
         if (extractedText) break;
       }
     }
-    console.log("extractedText: ", extractedText);
 
     return {
       text: extractedText,
@@ -214,7 +236,7 @@ export async function generateText(
     });
 
     // Build request parameters
-    const requestParams: any = {
+    const requestParams: ResponsesAPIInputRequestParams = {
       model: openaiConfig.gpt.model,
       input: prompt,
       store,
@@ -227,8 +249,6 @@ export async function generateText(
 
     // Call OpenAI Responses API
     const response = await openai.responses.create(requestParams);
-
-    console.log("response: ", response);
 
     logger.info('Text generated successfully', {
       id: response.id,
@@ -253,7 +273,6 @@ export async function generateText(
         if (extractedText) break;
       }
     }
-    console.log("extractedText: ", extractedText);
 
     return {
       text: extractedText,
