@@ -95,6 +95,17 @@ router.post(
   TextGenerationController.generateText
 );
 
+/**
+ * @route   POST /api/practice/generate/suggestions
+ * @desc    Generate response suggestions for conversation
+ * @access  Public/Private
+ * @body    {topic: string, conversationHistory: string, options?: TextGenerationOptions}
+ */
+router.post(
+  '/generate/suggestions',
+  TextGenerationController.generateSuggestions
+);
+
 // ============ Translation Routes ============
 
 /**

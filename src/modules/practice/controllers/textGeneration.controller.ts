@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { talkWithSpecificTopic, generateText } from '@services/openai';
+import { talkWithSpecificTopic, generateText, generateResponseSuggestions } from '@services/openai';
 import { ResponseHandler } from '@shared/utils/response';
 import { AppError } from '@shared/utils/errors';
 import { ErrorCodes } from '@shared/constants/errorCodes';
@@ -110,6 +110,57 @@ export class TextGenerationController {
       const result = await generateText(prompt, options);
 
       ResponseHandler.success(res, result, 'Text generated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Generate response suggestions for conversation
+   * POST /api/practice/generate/suggestions
+   *
+   * @body {topic: string, conversationHistory: string, options?: {store?: boolean, include?: string[]}}
+   */
+  public static async generateSuggestions(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { topic, conversationHistory, options } = req.body;
+
+      if (!topic || typeof topic !== 'string') {
+        throw new AppError(
+          ErrorCodes.VALIDATION_ERROR,
+          'Topic is required and must be a string',
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      if (!conversationHistory || typeof conversationHistory !== 'string') {
+        throw new AppError(
+          ErrorCodes.VALIDATION_ERROR,
+          'Conversation history is required and must be a string',
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      if (topic.length > TextGenerationController.MAX_TOPIC_LENGTH) {
+        throw new AppError(
+          ErrorCodes.VALIDATION_ERROR,
+          `Topic is too long. Maximum ${TextGenerationController.MAX_TOPIC_LENGTH} characters allowed.`,
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      logger.info('Generating response suggestions', {
+        topicLength: topic.length,
+        historyLength: conversationHistory.length,
+      });
+
+      const result = await generateResponseSuggestions(topic, conversationHistory, options);
+
+      ResponseHandler.success(res, result, 'Response suggestions generated successfully');
     } catch (error) {
       next(error);
     }

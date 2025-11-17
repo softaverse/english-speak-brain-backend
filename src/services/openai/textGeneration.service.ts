@@ -314,7 +314,149 @@ export async function generateText(
   }
 }
 
+/**
+ * Response suggestions interface
+ */
+export interface ResponseSuggestionsResult {
+  suggestions: string[];
+}
+
+/**
+ * Generate response suggestions for conversation
+ * This function generates structured suggestions and parses them reliably
+ *
+ * @param topic - The conversation topic
+ * @param conversationHistory - Recent conversation messages
+ * @param options - Optional generation settings (store, include, etc.)
+ * @returns Parsed array of 3 suggestions
+ *
+ * @example
+ * ```typescript
+ * const result = await generateResponseSuggestions(
+ *   "Job interview",
+ *   "Teacher: Tell me about yourself.\nUser: I am a software engineer."
+ * );
+ * console.log(result.suggestions); // ["I have 5 years...", "I specialize in...", "I'm passionate about..."]
+ * ```
+ */
+export async function generateResponseSuggestions(
+  topic: string,
+  conversationHistory: string,
+  options: TextGenerationOptions = {}
+): Promise<ResponseSuggestionsResult> {
+  try {
+    const prompt = `Based on the following conversation topic and history, generate exactly 3 helpful response suggestions that the user could say next.
+
+Topic: ${topic}
+
+Conversation History:
+${conversationHistory}
+
+IMPORTANT: Your response must be a valid JSON object with this exact structure:
+{
+  "suggestions": [
+    "First suggestion as a complete, natural sentence",
+    "Second suggestion as a complete, natural sentence",
+    "Third suggestion as a complete, natural sentence"
+  ]
+}
+
+Each suggestion should be relevant, helpful, conversational, and different from each other. Provide ONLY the JSON object, no other text.`;
+
+    logger.info('Generating response suggestions', {
+      topicLength: topic.length,
+      historyLength: conversationHistory.length,
+    });
+
+    const response = await generateText(prompt, { ...options, store: false });
+
+    // Parse JSON response
+    let parsedResponse: ResponseSuggestionsResult;
+    try {
+      // Clean the text - remove markdown code blocks if present
+      let cleanText = response.text.trim();
+      if (cleanText.startsWith('```json')) {
+        cleanText = cleanText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleanText.startsWith('```')) {
+        cleanText = cleanText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+
+      parsedResponse = JSON.parse(cleanText);
+
+      // Validate structure
+      if (!parsedResponse.suggestions || !Array.isArray(parsedResponse.suggestions)) {
+        throw new Error('Invalid response structure: missing suggestions array');
+      }
+
+      // Ensure we have exactly 3 suggestions
+      if (parsedResponse.suggestions.length < 3) {
+        throw new Error(`Expected 3 suggestions, got ${parsedResponse.suggestions.length}`);
+      }
+
+      // Take only first 3 suggestions
+      parsedResponse.suggestions = parsedResponse.suggestions
+        .slice(0, 3)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      if (parsedResponse.suggestions.length < 3) {
+        throw new Error('Not enough valid suggestions after filtering');
+      }
+
+    } catch (parseError) {
+      logger.error('Failed to parse response suggestions', {
+        error: parseError instanceof Error ? parseError.message : 'Unknown error',
+        responseText: response.text.substring(0, 200),
+      });
+
+      // Fallback: try to split by newlines as last resort
+      const suggestions = response.text
+        .split('\n')
+        .map(s => s.trim())
+        .filter(s => s.length > 0 && !s.startsWith('{') && !s.startsWith('['))
+        .slice(0, 3);
+
+      if (suggestions.length >= 3) {
+        logger.warn('Used fallback parsing for suggestions');
+        parsedResponse = { suggestions: suggestions.slice(0, 3) };
+      } else {
+        throw new AppError(
+          ErrorCodes.INTERNAL_SERVER_ERROR,
+          'Failed to parse response suggestions from LLM output',
+          HttpStatus.INTERNAL_SERVER_ERROR
+        );
+      }
+    }
+
+    logger.info('Response suggestions generated successfully', {
+      count: parsedResponse.suggestions.length,
+    });
+
+    return parsedResponse;
+
+  } catch (error) {
+    logger.error('Error generating response suggestions', {
+      error: error instanceof Error ? {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+      } : error,
+    });
+
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError(
+      ErrorCodes.INTERNAL_SERVER_ERROR,
+      'Failed to generate response suggestions',
+      HttpStatus.INTERNAL_SERVER_ERROR
+    );
+  }
+}
+
 export default {
   talkWithSpecificTopic,
   generateText,
+  generateResponseSuggestions,
 };
