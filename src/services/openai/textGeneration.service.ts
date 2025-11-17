@@ -72,6 +72,19 @@ export interface TextGenerationResponse {
 }
 
 /**
+ * Helper function to extract text from OpenAI Responses API output
+ * Uses declarative array methods for cleaner, more maintainable code
+ *
+ * @param output - The output array from OpenAI Responses API
+ * @returns Extracted text content or empty string if not found
+ */
+function extractTextFromResponse(output: Array<any> | undefined): string {
+  const messageItem = output?.find(item => item.type === 'message');
+  const textContent = messageItem?.content?.find((content: any) => content.type === 'output_text');
+  return textContent?.text || '';
+}
+
+/**
  * Talk with specific topic using reusable OpenAI prompt
  * This function uses OpenAI's reusable prompt feature to generate conversation responses
  *
@@ -135,22 +148,8 @@ export async function talkWithSpecificTopic(
       usage: response.usage,
     });
 
-    // Extract text from output
-    let extractedText = '';
-    if (response.output && Array.isArray(response.output) && response.output.length > 0) {
-      // Find the first message with output_text
-      for (const item of response.output) {
-        if (item.type === 'message' && item.content && Array.isArray(item.content)) {
-          for (const contentItem of item.content) {
-            if (contentItem.type === 'output_text' && contentItem.text) {
-              extractedText = contentItem.text;
-              break;
-            }
-          }
-        }
-        if (extractedText) break;
-      }
-    }
+    // Extract text from output using helper function
+    const extractedText = extractTextFromResponse(response.output);
 
     return {
       text: extractedText,
@@ -257,22 +256,8 @@ export async function generateText(
       usage: response.usage,
     });
 
-    // Extract text from output
-    let extractedText = '';
-    if (response.output && Array.isArray(response.output) && response.output.length > 0) {
-      // Find the first message with output_text
-      for (const item of response.output) {
-        if (item.type === 'message' && item.content && Array.isArray(item.content)) {
-          for (const contentItem of item.content) {
-            if (contentItem.type === 'output_text' && contentItem.text) {
-              extractedText = contentItem.text;
-              break;
-            }
-          }
-        }
-        if (extractedText) break;
-      }
-    }
+    // Extract text from output using helper function
+    const extractedText = extractTextFromResponse(response.output);
 
     return {
       text: extractedText,
